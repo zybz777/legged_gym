@@ -106,8 +106,9 @@ class LeggedRobot(BaseTask):
         """ check terminations, compute observations and rewards
             calls self._post_physics_step_callback() for common computations 
             calls self._draw_debug_vis() if needed
+            检查终止条件，计算观测量和奖励
         """
-        self.gym.refresh_actor_root_state_tensor(self.sim)
+        self.gym.refresh_actor_root_state_tensor(self.sim) # base状态： 3x位置 4x四元数 3x线速度 3x角速度
         self.gym.refresh_net_contact_force_tensor(self.sim)
 
         self.episode_length_buf += 1
@@ -657,7 +658,6 @@ class LeggedRobot(BaseTask):
         termination_contact_names = []
         for name in self.cfg.asset.terminate_after_contacts_on:
             termination_contact_names.extend([s for s in body_names if name in s])
-
         base_init_state_list = self.cfg.init_state.pos + self.cfg.init_state.rot + self.cfg.init_state.lin_vel + self.cfg.init_state.ang_vel
         self.base_init_state = to_torch(base_init_state_list, device=self.device, requires_grad=False)
         start_pose = gymapi.Transform()

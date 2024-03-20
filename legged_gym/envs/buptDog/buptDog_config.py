@@ -3,8 +3,8 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 
 class BuptDogCfg(LeggedRobotCfg):
     class env:
-        num_envs = 128
-        num_observations = 235
+        num_envs = 4096  # 4096
+        num_observations = 235 # 48本体量+187高程图
         num_privileged_obs = None  # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise
         num_actions = 12
         env_spacing = 3.0  # not used with heightfields/trimeshes
@@ -31,7 +31,7 @@ class BuptDogCfg(LeggedRobotCfg):
     class control(LeggedRobotCfg.control):
         # PD Drive parameters:
         control_type = "P"
-        stiffness = {"joint": 50.0}  # [N*m/rad]
+        stiffness = {"joint": 20.0}  # [N*m/rad]
         damping = {"joint": 2.0}  # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
@@ -49,6 +49,7 @@ class BuptDogCfg(LeggedRobotCfg):
     class rewards(LeggedRobotCfg.rewards):
         soft_dof_pos_limit = 0.9
         base_height_target = 0.25
+        max_contact_force = 150
 
         class scales(LeggedRobotCfg.rewards.scales):
             torques = -0.0002
@@ -56,6 +57,11 @@ class BuptDogCfg(LeggedRobotCfg):
 
 
 class BuptDogCfgPPO(LeggedRobotCfgPPO):
+    class policy(LeggedRobotCfgPPO.policy):
+        actor_hidden_dims = [512, 256, 128]
+        critic_hidden_dims = [512, 256, 128]
+        activation = "elu"  # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
+
     class algorithm(LeggedRobotCfgPPO.algorithm):
         entropy_coef = 0.01
 
