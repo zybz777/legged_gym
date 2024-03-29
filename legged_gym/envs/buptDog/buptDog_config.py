@@ -4,7 +4,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 class BuptDogCfg(LeggedRobotCfg):
     class env:
         num_envs = 4096  # 4096
-        num_observations = 235 # 48本体量+187高程图
+        num_observations = 235  # 48本体量+187高程图
         num_privileged_obs = None  # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise
         num_actions = 12
         env_spacing = 3.0  # not used with heightfields/trimeshes
@@ -32,7 +32,7 @@ class BuptDogCfg(LeggedRobotCfg):
         # PD Drive parameters:
         control_type = "P"
         stiffness = {"joint": 20.0}  # [N*m/rad]
-        damping = {"joint": 2.0}  # [N*m*s/rad]
+        damping = {"joint": 0.5}  # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
         # decimation: Number of control action updates @ sim DT per policy DT
@@ -47,8 +47,10 @@ class BuptDogCfg(LeggedRobotCfg):
         self_collisions = 1  # 1 to disable, 0 to enable...bitwise filter
 
     class rewards(LeggedRobotCfg.rewards):
-        soft_dof_pos_limit = 0.9
-        base_height_target = 0.25
+        soft_dof_pos_limit = 0.8
+        soft_dof_vel_limit = 0.8
+        soft_torque_limit = 0.8
+        base_height_target = 1.0
         max_contact_force = 150
 
         class scales(LeggedRobotCfg.rewards.scales):

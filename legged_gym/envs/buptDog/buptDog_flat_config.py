@@ -3,7 +3,8 @@ from legged_gym.envs import BuptDogCfg, BuptDogCfgPPO
 
 class BuptDogFlatCfg(BuptDogCfg):
     class env(BuptDogCfg.env):
-        num_observations = 48
+        num_observations = 48  # 48
+        num_envs = 4096
 
     class terrain(BuptDogCfg.terrain):
         mesh_type = "plane"
@@ -13,9 +14,11 @@ class BuptDogFlatCfg(BuptDogCfg):
         self_collisions = 0  # 1 to disable, 0 to enable...bitwise filter
 
     class rewards(BuptDogCfg.rewards):
-        max_contact_force = 150.0
+        max_contact_force = 120.0
 
         class scales(BuptDogCfg.rewards.scales):
+            tracking_lin_vel = 1.5
+            lin_vel_z = -2.5
             orientation = -5.0
             feet_air_time = 2.0
 
@@ -35,8 +38,8 @@ class BuptDogFlatCfg(BuptDogCfg):
 
 class BuptDogFlatCfgPPO(BuptDogCfgPPO):
     class policy(BuptDogCfgPPO.policy):
-        actor_hidden_dims = [512, 256, 128, 64, 32]
-        critic_hidden_dims = [512, 256, 128, 64, 32]
+        actor_hidden_dims = [128, 64, 32]
+        critic_hidden_dims = [128, 64, 32]
         activation = "elu"  # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
 
     class algorithm(BuptDogCfgPPO.algorithm):
@@ -46,4 +49,4 @@ class BuptDogFlatCfgPPO(BuptDogCfgPPO):
         run_name = ""
         experiment_name = "flat_buptDog"
         load_run = -1
-        max_iterations = 2000
+        max_iterations = 1500
