@@ -120,7 +120,7 @@ class LeggedRobotCfg(BaseConfig):
         decimation = 4
 
     class asset:
-        file = ""
+        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/buptDog/urdf/robot.urdf"
         name = "legged_robot"  # actor name
         foot_name = "None"  # name of the feet bodies, used to index body state and contact force tensors
         penalize_contacts_on = []
