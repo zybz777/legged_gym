@@ -38,8 +38,8 @@ class BuptDogFlatCfg(BuptDogCfg):
 
 class BuptDogFlatCfgPPO(BuptDogCfgPPO):
     class policy(BuptDogCfgPPO.policy):
-        actor_hidden_dims = [128, 64, 32]
-        critic_hidden_dims = [128, 64, 32]
+        actor_hidden_dims = [512, 256, 128]
+        critic_hidden_dims = [512, 256, 128]
         activation = "elu"  # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
 
     class algorithm(BuptDogCfgPPO.algorithm):

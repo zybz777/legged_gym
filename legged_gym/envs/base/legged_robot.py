@@ -105,9 +105,11 @@ class LeggedRobot(BaseTask):
         return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras
 
     def compute_feet_data(self):
-        # 摆动腿
+        # 计算步态时间
         self.envs_t += self.dt
         self.envs_t_foot = torch.sin(2 * np.pi * (self.envs_t.view(-1, 1) + self.envs_t_foot_offset))
+
+        # 摆动腿数据更新
         indices = (torch.tile(self.feet_indices, (self.num_envs,)) +
                    torch.repeat_interleave(torch.arange(self.num_envs, device=self.device),
                                            repeats=self.feet_indices.shape[0]) * self.num_bodies)
@@ -118,6 +120,18 @@ class LeggedRobot(BaseTask):
                                self.root_states[:, :3].unsqueeze(1).expand(-1, 4, -1).reshape(-1, 3))
         self.feet_pos_2Base = quat_rotate_inverse(self.base_quat.unsqueeze(1).expand(-1, 4, -1).reshape(-1, 4),
                                                   self.feet_pos_2Base)
+        # 摆动腿期望轨迹计算
+        target_h = 0.05
+        self.target_feet_height_2Base = torch.clip(target_h * (
+                self.envs_t_foot - torch.sin(2 * torch.pi * self.envs_t_foot) / (2 * torch.pi)),
+                                                   0, target_h)
+        self.target_feet_height_2Base += -0.31
+        self.target_feet_height_vel_2Base = target_h * (1 - torch.cos(2 * torch.pi * self.envs_t_foot))
+        self.target_feet_contact[self.envs_t_foot > 0] = 0
+        self.target_feet_contact[self.envs_t_foot <= 0] = 1
+        # print(self.target_feet_contact)
+        # print("target_H", self.target_feet_height_2Base)
+        # print("target_vel", self.target_feet_height_vel_2Base)
 
     def post_physics_step(self):
         """ check terminations, compute observations and rewards
@@ -620,6 +634,13 @@ class LeggedRobot(BaseTask):
         self.feet_vel_inWorld = torch.zeros_like(self.feet_pos_inWorld)  # 世界系足端速度 [dx dy dz]
         self.feet_pos_2Base = torch.zeros_like(self.feet_pos_inWorld)
         self.feet_vel_2Base = torch.zeros_like(self.feet_pos_inWorld)
+        # 足端期望
+        self.target_feet_height_2Base = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float,
+                                                    device=self.device, requires_grad=False)  # 自身系下摆动腿期望足端高度
+        self.target_feet_height_vel_2Base = torch.zeros_like(self.target_feet_height_2Base)
+        self.target_feet_vel_inWorld = torch.zeros_like(self.feet_vel_inWorld)  # 世界系下支撑腿期望速度
+        self.target_feet_contact = torch.ones(self.num_envs, self.feet_indices.shape[0], dtype=torch.int8,
+                                              device=self.device, requires_grad=False)  # 1为contact 0为swing
 
     def _prepare_reward_function(self):
         """ Prepares a list of reward functions, whcih will be called to compute the total reward.
@@ -1008,3 +1029,12 @@ class LeggedRobot(BaseTask):
         # penalize high contact forces
         return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :],
                                      dim=-1) - self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
+
+    def _reward_feet_swing_height(self):
+        feet_height_2Base = self.feet_pos_2Base[:, 2].reshape(-1, 4)
+        feet_height_err = torch.sum(
+            torch.square(self.target_feet_height_2Base - feet_height_2Base)[self.target_feet_contact == 0])
+        return torch.exp(-feet_height_err / self.cfg.rewards.tracking_sigma)
+
+    def _reward_feet_contact_vel(self):
+        return 0
