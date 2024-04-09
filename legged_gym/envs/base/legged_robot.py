@@ -48,7 +48,6 @@ from legged_gym.utils.terrain import Terrain
 from legged_gym.utils.math import quat_apply_yaw, wrap_to_pi, torch_rand_sqrt_float
 from legged_gym.utils.helpers import class_to_dict
 from .legged_robot_config import LeggedRobotCfg
-from legged_gym.envs.base.robot_dynamic import RobotDynamic
 
 
 class LeggedRobot(BaseTask):
@@ -105,42 +104,41 @@ class LeggedRobot(BaseTask):
             self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
         return self.obs_buf, self.privileged_obs_buf, self.rew_buf, self.reset_buf, self.extras
 
-    def robots_step(self, id):
-        # q = self.robots_q[id]
-        # dq = self.robots_dq[id]
-        return None
+    def compute_feet_data(self):
+        # 摆动腿
+        self.envs_t += self.dt
+        self.envs_t_foot = torch.sin(2 * np.pi * (self.envs_t.view(-1, 1) + self.envs_t_foot_offset))
+        indices = (torch.tile(self.feet_indices, (self.num_envs,)) +
+                   torch.repeat_interleave(torch.arange(self.num_envs, device=self.device),
+                                           repeats=self.feet_indices.shape[0]) * self.num_bodies)
+
+        self.feet_pos_inWorld = self.rigid_body_states[indices, :3]
+        self.feet_vel_inWorld = self.rigid_body_states[indices, 7:10]
+        self.feet_pos_2Base = (self.feet_pos_inWorld -
+                               self.root_states[:, :3].unsqueeze(1).expand(-1, 4, -1).reshape(-1, 3))
+        self.feet_pos_2Base = quat_rotate_inverse(self.base_quat.unsqueeze(1).expand(-1, 4, -1).reshape(-1, 4),
+                                                  self.feet_pos_2Base)
 
     def post_physics_step(self):
         """ check terminations, compute observations and rewards
-            calls self._post_physics_step_callback() for common computations 
+            calls self._post_physics_step_callback() for common computations
             calls self._draw_debug_vis() if needed
             检查终止条件，计算观测量和奖励
         """
         self.gym.refresh_actor_root_state_tensor(self.sim)  # base状态： 3x位置 4x四元数 3x线速度 3x角速度
         self.gym.refresh_net_contact_force_tensor(self.sim)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
 
         self.episode_length_buf += 1
         self.common_step_counter += 1
-        # 摆动腿
-        self.envs_t += self.dt
-        self.envs_t_foot = torch.sin(2 * np.pi * (self.envs_t.view(-1, 1) + self.envs_t_foot_offset))
-        # print(self.envs_t_foot)
-        # self.robot.forward_kinematics()
-        # print(self.envs_t)
-        # prepare quantities
+
+        # 质心数据更新
         self.base_quat[:] = self.root_states[:, 3:7]
         self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
         self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
-        # 机器人运动学计算
-        # self.robots_q_tensor = torch.cat((self.root_states[:, :7], self.dof_pos), dim=-1)
-        # self.robots_dq_tensor = torch.cat((self.base_lin_vel, self.base_ang_vel, self.dof_vel), dim=-1)
-        # self.robots_q = self.robots_q_tensor.cpu().numpy()
-        # self.robots_dq = self.robots_dq_tensor.cpu().numpy()
-        for i, robot in enumerate(self.robots):
-            q = torch.cat((self.root_states[i, :7], self.dof_pos[i, :]))
-            dq = torch.cat((self.base_lin_vel[i, :], self.base_ang_vel[i, :], self.dof_vel[i, :]))
-            robot.step(q, dq)
+        self.compute_feet_data()  # 腿部数据
+
         self._post_physics_step_callback()
         # compute observations, rewards, resets, ...
         self.check_termination()
@@ -348,7 +346,7 @@ class LeggedRobot(BaseTask):
         """ Callback called before computing terminations, rewards, and observations
             Default behaviour: Compute ang vel command based on target and heading, compute measured terrain heights and randomly push robots
         """
-        # 
+        #
         env_ids = (self.episode_length_buf % int(self.cfg.commands.resampling_time / self.dt) == 0).nonzero(
             as_tuple=False).flatten()
         self._resample_commands(env_ids)
@@ -458,7 +456,7 @@ class LeggedRobot(BaseTask):
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
     def _push_robots(self):
-        """ Random pushes the robots. Emulates an impulse by setting a randomized base velocity. 
+        """ Random pushes the robots. Emulates an impulse by setting a randomized base velocity.
         """
         max_vel = self.cfg.domain_rand.max_push_vel_xy
         self.root_states[:, 7:9] = torch_rand_float(-max_vel, max_vel, (self.num_envs, 2),
@@ -537,13 +535,20 @@ class LeggedRobot(BaseTask):
         actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
         net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
+        rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        rigid_body_jacobian = self.gym.acquire_jacobian_tensor(self.sim, self.gym.get_actor_name(self.envs[0],
+                                                                                                 self.actor_handles[0]))
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
-
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        self.gym.refresh_jacobian_tensors(self.sim)
+        # rigid_body_jacobian
         # create some wrapper tensors for different slices
         self.root_states = gymtorch.wrap_tensor(actor_root_state)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+        self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_state)
+        self.rigid_body_jacobian = gymtorch.wrap_tensor(rigid_body_jacobian)
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
         self.base_quat = self.root_states[:, 3:7]
@@ -602,21 +607,19 @@ class LeggedRobot(BaseTask):
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
         # 摆动腿参数初始化
-        self.robots = [RobotDynamic(self.cfg) for _ in range(self.num_envs)]
-        self.robots_q_tensor = torch.zeros(self.num_envs, 19, dtype=torch.float,
-                                           device=self.device, requires_grad=False)
-        self.robots_dq_tensor = torch.zeros(self.num_envs, 19, dtype=torch.float,
-                                            device=self.device, requires_grad=False)
-        self.robots_q = np.zeros((self.num_envs, 19))
-        self.robots_dq = np.zeros((self.num_envs, 18))
         self.envs_t = torch.zeros(self.num_envs, dtype=torch.float,
                                   device=self.device, requires_grad=False)  # 每个机器人在仿真中的时间
         self.envs_t_foot_offset = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float,
                                               device=self.device, requires_grad=False)  # 每个机器人四条腿的相位差
         self.envs_t_foot_offset[:, 1] = 0.5
-        self.envs_t_foot_offset[:, 3] = 0.5
+        self.envs_t_foot_offset[:, 2] = 0.5
         self.envs_t_foot = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float,
                                        device=self.device, requires_grad=False)  # 每个机器人在仿真中的时间四条腿的相位 [0~1]
+        self.feet_pos_inWorld = torch.zeros(self.num_envs * 4, 3, dtype=torch.float,
+                                            device=self.device, requires_grad=False)  # 世界系足端位置 [x y z]
+        self.feet_vel_inWorld = torch.zeros_like(self.feet_pos_inWorld)  # 世界系足端速度 [dx dy dz]
+        self.feet_pos_2Base = torch.zeros_like(self.feet_pos_inWorld)
+        self.feet_vel_2Base = torch.zeros_like(self.feet_pos_inWorld)
 
     def _prepare_reward_function(self):
         """ Prepares a list of reward functions, whcih will be called to compute the total reward.
@@ -696,7 +699,7 @@ class LeggedRobot(BaseTask):
         """ Creates environments:
              1. loads the robot URDF/MJCF asset,
              2. For each environment
-                2.1 creates the environment, 
+                2.1 creates the environment,
                 2.2 calls DOF and Rigid shape properties callbacks,
                 2.3 create actor with these properties and add them to the env
              3. Store indices of different bodies of the robot
@@ -732,6 +735,7 @@ class LeggedRobot(BaseTask):
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
         feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
+        self.feet_names = feet_names
         penalized_contact_names = []
         for name in self.cfg.asset.penalize_contacts_on:
             penalized_contact_names.extend([s for s in body_names if name in s])
@@ -972,7 +976,7 @@ class LeggedRobot(BaseTask):
         return torch.exp(-lin_vel_error / self.cfg.rewards.tracking_sigma)
 
     def _reward_tracking_ang_vel(self):
-        # Tracking of angular velocity commands (yaw) 
+        # Tracking of angular velocity commands (yaw)
         ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
         return torch.exp(-ang_vel_error / self.cfg.rewards.tracking_sigma)
 
