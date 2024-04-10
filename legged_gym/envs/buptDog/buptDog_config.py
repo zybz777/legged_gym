@@ -12,7 +12,7 @@ class BuptDogCfg(LeggedRobotCfg):
         episode_length_s = 20  # episode length in seconds
 
     class init_state(LeggedRobotCfg.init_state):
-        pos = [0.0, 0.0, 0.393371]  # x,y,z [m]
+        pos = [0.0, 0.0, 0.31]  # x,y,z [m]
         default_joint_angles = {  # = target angles [rad] when action = 0.0
             "FL_X_joint": 0.0,  # [rad]
             "HL_X_joint": 0.0,  # [rad]

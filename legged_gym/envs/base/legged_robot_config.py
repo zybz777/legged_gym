@@ -170,6 +170,7 @@ class LeggedRobotCfg(BaseConfig):
             action_rate = -0.01
             stand_still = -0.0
             feet_swing_height = 0.2
+            feet_swing_height_vel = 0.2
             feet_contact_vel = -0.05
 
         only_positive_rewards = True  # if true negative total rewards are clipped at zero (avoids early termination problems)

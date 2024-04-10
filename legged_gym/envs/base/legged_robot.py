@@ -116,12 +116,15 @@ class LeggedRobot(BaseTask):
 
         self.feet_pos_inWorld = self.rigid_body_states[indices, :3]
         self.feet_vel_inWorld = self.rigid_body_states[indices, 7:10]
+        self.last_feet_pos_2Base = self.feet_pos_2Base
         self.feet_pos_2Base = (self.feet_pos_inWorld -
                                self.root_states[:, :3].unsqueeze(1).expand(-1, 4, -1).reshape(-1, 3))
         self.feet_pos_2Base = quat_rotate_inverse(self.base_quat.unsqueeze(1).expand(-1, 4, -1).reshape(-1, 4),
                                                   self.feet_pos_2Base)
+        self.feet_vel_2Base = (self.feet_pos_2Base - self.last_feet_pos_2Base) / self.dt
+        # print(self.feet_vel_2Base)
         # 摆动腿期望轨迹计算
-        target_h = 0.05
+        target_h = 0.075
         self.target_feet_height_2Base = torch.clip(target_h * (
                 self.envs_t_foot - torch.sin(2 * torch.pi * self.envs_t_foot) / (2 * torch.pi)),
                                                    0, target_h)
@@ -248,7 +251,7 @@ class LeggedRobot(BaseTask):
                                   self.base_ang_vel * self.obs_scales.ang_vel,
                                   self.projected_gravity,
                                   self.commands[:, :3] * self.commands_scale,
-                                  (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
+                                  self.dof_pos * self.obs_scales.dof_pos,
                                   self.dof_vel * self.obs_scales.dof_vel,
                                   self.actions
                                   ), dim=-1)
@@ -634,6 +637,7 @@ class LeggedRobot(BaseTask):
         self.feet_vel_inWorld = torch.zeros_like(self.feet_pos_inWorld)  # 世界系足端速度 [dx dy dz]
         self.feet_pos_2Base = torch.zeros_like(self.feet_pos_inWorld)
         self.feet_vel_2Base = torch.zeros_like(self.feet_pos_inWorld)
+        self.last_feet_pos_2Base = torch.zeros_like(self.feet_pos_2Base)
         # 足端期望
         self.target_feet_height_2Base = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float,
                                                     device=self.device, requires_grad=False)  # 自身系下摆动腿期望足端高度
@@ -954,7 +958,7 @@ class LeggedRobot(BaseTask):
 
     def _reward_dof_vel(self):
         # Penalize dof velocities
-        return torch.sum(torch.square(self.dof_vel), dim=1)
+        return torch.sum(torch.square(self.last_dof_vel - self.dof_vel), dim=1)
 
     def _reward_dof_acc(self):
         # Penalize dof accelerations
@@ -1034,7 +1038,18 @@ class LeggedRobot(BaseTask):
         feet_height_2Base = self.feet_pos_2Base[:, 2].reshape(-1, 4)
         feet_height_err = torch.sum(
             torch.square(self.target_feet_height_2Base - feet_height_2Base)[self.target_feet_contact == 0])
-        return torch.exp(-feet_height_err / self.cfg.rewards.tracking_sigma)
+        return torch.exp(-feet_height_err / 4)
+
+    def _reward_feet_swing_height_vel(self):
+        feet_height_vel_2Base = self.feet_vel_2Base[:, 2].reshape(-1, 4)
+        feet_height_vel_err = torch.sum(
+            torch.square(self.target_feet_height_vel_2Base - feet_height_vel_2Base)[self.target_feet_contact == 0])
+        # print(feet_height_vel_err)
+        return torch.exp(-feet_height_vel_err / 800)
 
     def _reward_feet_contact_vel(self):
-        return 0
+        feet_vel_x = self.feet_vel_inWorld[:, 0].reshape(-1, 4)[self.target_feet_contact == 1]
+        feet_vel_y = self.feet_vel_inWorld[:, 1].reshape(-1, 4)[self.target_feet_contact == 1]
+        feet_vel_z = self.feet_vel_inWorld[:, 2].reshape(-1, 4)[self.target_feet_contact == 1]
+        feet_vel = torch.cat((feet_vel_x, feet_vel_y, feet_vel_z))
+        return torch.sum(torch.square(feet_vel))

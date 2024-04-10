@@ -15,12 +15,31 @@ class BuptDogFlatCfg(BuptDogCfg):
 
     class rewards(BuptDogCfg.rewards):
         max_contact_force = 120.0
+        soft_dof_pos_limit = 0.6
+        soft_dof_vel_limit = 0.75
+        soft_torque_limit = 0.75
+        base_height_target = 0.31
 
         class scales(BuptDogCfg.rewards.scales):
-            tracking_lin_vel = 1.5
+            tracking_lin_vel = 1.0
             lin_vel_z = -2.5
             orientation = -5.0
-            feet_air_time = 2.0
+            feet_air_time = 0.0
+            feet_swing_height = 10.0
+            feet_swing_height_vel = 1.5
+
+            termination = -0.0
+            tracking_ang_vel = 0.5
+            ang_vel_xy = -0.05
+            torques = -0.00001
+            dof_vel = -0.00001
+            dof_acc = -2.5e-7
+            base_height = -5.0
+            collision = -2.0
+            feet_stumble = -0.0
+            action_rate = -0.01
+            stand_still = -0.00001
+            feet_contact_vel = -0.000001
 
     class commands(BuptDogCfg.commands):
         heading_command = False
@@ -49,4 +68,4 @@ class BuptDogFlatCfgPPO(BuptDogCfgPPO):
         run_name = ""
         experiment_name = "flat_buptDog"
         load_run = -1
-        max_iterations = 1500
+        max_iterations = 3000
