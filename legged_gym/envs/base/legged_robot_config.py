@@ -157,6 +157,11 @@ class LeggedRobotCfg(BaseConfig):
             termination = -0.0
             tracking_lin_vel = 1.0
             tracking_ang_vel = 0.5
+            tracking_contacts_shaped_force = 0.
+            tracking_contacts_shaped_vel = 0.
+            raibert_heuristic = 0.
+            feet_clearance_cmd_linear = 0.
+
             lin_vel_z = -2.0
             ang_vel_xy = -0.05
             orientation = -0.0
@@ -168,13 +173,13 @@ class LeggedRobotCfg(BaseConfig):
             collision = -1.0
             feet_stumble = -0.0
             action_rate = -0.01
+            action_rate2 = -2e-3
             stand_still = -0.0
-            feet_swing_height = 0.2
-            feet_swing_height_vel = 0.2
-            feet_contact_vel = -0.05
 
         only_positive_rewards = True  # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25  # tracking reward = exp(-error^2/sigma)
+        gait_force_sigma = 50.
+        gait_vel_sigma = 0.5
         soft_dof_pos_limit = (
             1.0  # percentage of urdf limits, values above this limit are penalized
         )

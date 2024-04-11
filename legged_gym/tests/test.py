@@ -1,10 +1,24 @@
+import torch
 import matplotlib.pyplot as plt
-import numpy as np
 
-print(np.exp(-25/0.25))
+kappa = 0.05
+smoothing_cdf_start = torch.distributions.normal.Normal(0,
+                                                        kappa).cdf
 
-print(np.exp(-25/0.5))
-
-print(np.exp(-25/4))
-
-print(np.exp(-5000/800))
+t = torch.linspace(0, 1, 50)
+t1 = t + 0.5
+print(t)
+smoothing_multiplier_FL = (smoothing_cdf_start(torch.remainder(t, 1.0)) * (
+                    1 - smoothing_cdf_start(torch.remainder(t, 1.0) - 0.5)) +
+                                       smoothing_cdf_start(torch.remainder(t, 1.0) - 1) * (
+                                               1 - smoothing_cdf_start(
+                                           torch.remainder(t, 1.0) - 0.5 - 1)))
+smoothing_multiplier_FR = (smoothing_cdf_start(torch.remainder(t1, 1.0)) * (
+                    1 - smoothing_cdf_start(torch.remainder(t1, 1.0) - 0.5)) +
+                                       smoothing_cdf_start(torch.remainder(t1, 1.0) - 1) * (
+                                               1 - smoothing_cdf_start(
+                                           torch.remainder(t1, 1.0) - 0.5 - 1)))
+print(smoothing_multiplier_FL)
+plt.plot(t.numpy(), smoothing_multiplier_FL.numpy())
+plt.plot(t.numpy(), smoothing_multiplier_FR.numpy())
+plt.show()
