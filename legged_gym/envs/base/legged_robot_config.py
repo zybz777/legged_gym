@@ -37,6 +37,7 @@ class LeggedRobotCfg(BaseConfig):
         num_observations = 235
         num_privileged_obs = None  # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise
         num_actions = 12
+        horizon = 10
         env_spacing = 3.0  # not used with heightfields/trimeshes
         send_timeouts = True  # send time out information to the algorithm
         episode_length_s = 20  # episode length in seconds
@@ -89,7 +90,8 @@ class LeggedRobotCfg(BaseConfig):
     class commands:
         curriculum = False
         max_curriculum = 1.0
-        num_commands = 4  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
+        num_commands = 4 + 1  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
+        # lin_vel_x, lin_vel_y, ang_vel_yaw, heading, foot_height
         resampling_time = 10.0  # time before command are changed[s]
         heading_command = True  # if true: compute ang vel command from heading error
 
@@ -98,6 +100,7 @@ class LeggedRobotCfg(BaseConfig):
             lin_vel_y = [-1.0, 1.0]  # min max [m/s]
             ang_vel_yaw = [-1, 1]  # min max [rad/s]
             heading = [-3.14, 3.14]
+            foot_height = [0.05, 0.075]
 
     class init_state:
         pos = [0.0, 0.0, 1.0]  # x,y,z [m]
@@ -232,7 +235,7 @@ class LeggedRobotCfg(BaseConfig):
             rest_offset = 0.0  # [m]
             bounce_threshold_velocity = 0.5  # 0.5 [m/s]
             max_depenetration_velocity = 1.0
-            max_gpu_contact_pairs = 2**23  # 2**24 -> needed for 8000 envs and more
+            max_gpu_contact_pairs = 2 ** 23  # 2**24 -> needed for 8000 envs and more
             default_buffer_size_multiplier = 5
             contact_collection = (
                 2  # 0: never, 1: last sub-step, 2: all sub-steps (default=2)
