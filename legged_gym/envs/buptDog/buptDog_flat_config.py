@@ -29,21 +29,22 @@ class BuptDogFlatCfg(BuptDogCfg):
             tracking_contacts_shaped_vel = -0.0002
             raibert_heuristic = -0.0015
             feet_clearance_cmd_linear = -0.015
-            lin_vel_z = -1.0
-            orientation = -3.0
+            lin_vel_z = -2.0
+            orientation = -5.0
             feet_air_time = 1.0
             feet_slip = -0.08
 
             termination = -0.0
             ang_vel_xy = -0.15
             torques = -2.5e-5
-            dof_vel = -2.5e-5
-            dof_acc = -2.5e-7
+            dof_pos = -0.25
+            dof_vel = -5e-5
+            dof_acc = -5e-7
             base_height = -5.0
-            collision = -1.0
+            collision = -2.0
             feet_stumble = -0.0
-            action_rate = -2e-3
-            action_rate2 = -2e-3
+            action_rate = -2.5e-3
+            action_rate2 = -2.5e-3
             stand_still = -0.00001
 
     class commands(BuptDogCfg.commands):
