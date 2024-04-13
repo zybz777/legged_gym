@@ -27,14 +27,15 @@ class BuptDogFlatCfg(BuptDogCfg):
             tracking_lin_vel = 4.0
             tracking_contacts_shaped_force = -0.0002
             tracking_contacts_shaped_vel = -0.0002
-            raibert_heuristic = -0.001
-            feet_clearance_cmd_linear = -0.01
+            raibert_heuristic = -0.0015
+            feet_clearance_cmd_linear = -0.015
             lin_vel_z = -1.0
-            orientation = -2.0
-            feet_air_time = 0.0
+            orientation = -3.0
+            feet_air_time = 1.0
+            feet_slip = -0.08
 
             termination = -0.0
-            ang_vel_xy = -0.1
+            ang_vel_xy = -0.15
             torques = -2.5e-5
             dof_vel = -2.5e-5
             dof_acc = -2.5e-7

@@ -1143,3 +1143,12 @@ class LeggedRobot(BaseTask):
             1) * phases + 0.02  # offset for foot radius 2cm || target height = 5cm
         rew_foot_clearance = torch.square(target_height - foot_height) * (1 - self.desired_contact_states)
         return torch.sum(rew_foot_clearance)
+
+    def _reward_feet_slip(self):
+        contact = self.contact_forces[:, self.feet_indices, 2] > 1.
+        contact_filt = torch.logical_or(contact, self.last_contacts)
+        self.last_contacts = contact
+        foot_velocities = torch.square(
+            torch.norm(self.foot_velocities[:, :, 0:2], dim=2).view(self.num_envs, -1))
+        rew_slip = torch.sum(contact_filt * foot_velocities, dim=1)
+        return rew_slip

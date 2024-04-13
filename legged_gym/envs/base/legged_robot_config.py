@@ -164,6 +164,7 @@ class LeggedRobotCfg(BaseConfig):
             tracking_contacts_shaped_vel = 0.
             raibert_heuristic = 0.
             feet_clearance_cmd_linear = 0.
+            feet_slip = 0.
 
             lin_vel_z = -2.0
             ang_vel_xy = -0.05
