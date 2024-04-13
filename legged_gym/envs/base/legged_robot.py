@@ -244,17 +244,6 @@ class LeggedRobot(BaseTask):
                                   self.clock_inputs,
                                   self.commands[:, 4].unsqueeze(-1)
                                   ), dim=-1)
-        # self.obs_buf = torch.cat((self.horizon_base_lin_vel * self.obs_scales.lin_vel,
-        #                           self.horizon_base_ang_vel * self.obs_scales.ang_vel,
-        #                           self.horizon_projected_gravity,
-        #                           self.horizon_commands[:, :, :3] * self.commands_scale,
-        #                           self.horizon_commands[:, :, 4].unsqueeze(-1),
-        #                           (self.horizon_dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
-        #                           self.horizon_dof_pos * self.obs_scales.dof_pos,
-        #                           self.horizon_dof_vel * self.obs_scales.dof_vel,
-        #                           self.horizon_actions,
-        #                           self.horizon_clock_inputs
-        #                           ), dim=-1).view(self.num_envs, -1)
         # add perceptive inputs if not blind
         if self.cfg.terrain.measure_heights:
             heights = torch.clip(self.root_states[:, 2].unsqueeze(1) - 0.5 - self.measured_heights, -1,
