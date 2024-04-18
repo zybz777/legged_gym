@@ -90,8 +90,10 @@ class LeggedRobotCfg(BaseConfig):
     class commands:
         curriculum = False
         max_curriculum = 1.0
-        num_commands = 4 + 1  # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
-        # lin_vel_x, lin_vel_y, ang_vel_yaw, heading, foot_height
+        num_commands = 4 + 1 + 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
+        # lin_vel_x, lin_vel_y, ang_vel_yaw, heading
+        # foot_height
+        # phases offsets bounds durations
         resampling_time = 10.0  # time before command are changed[s]
         heading_command = True  # if true: compute ang vel command from heading error
 

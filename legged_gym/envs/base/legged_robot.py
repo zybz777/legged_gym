@@ -85,11 +85,11 @@ class LeggedRobot(BaseTask):
             actions (torch.Tensor): Tensor of shape (num_envs, num_actions_per_env)
         """
         clip_actions = self.cfg.normalization.clip_actions
-        self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
+        self.actions[:] = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
         # step physics and render each frame
         self.render()
         for _ in range(self.cfg.control.decimation):
-            self.torques = self._compute_torques(self.actions).view(self.torques.shape)
+            self.torques[:] = self._compute_torques(self.actions).view(self.torques.shape)
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
             self.gym.simulate(self.sim)
             if self.device == 'cpu':
@@ -128,31 +128,19 @@ class LeggedRobot(BaseTask):
         self.foot_velocities[:] = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices,
                                   7:10]
         self._post_physics_step_callback()
-        self.horizon_base_lin_vel = torch.cat((self.horizon_base_lin_vel[:, 1:, :], self.base_lin_vel.unsqueeze(1)),
-                                              dim=1)
-        self.horizon_base_ang_vel = torch.cat((self.horizon_base_ang_vel[:, 1:, :], self.base_ang_vel.unsqueeze(1)),
-                                              dim=1)
-        self.horizon_projected_gravity = torch.cat((self.horizon_projected_gravity[:, 1:, :],
-                                                    self.projected_gravity.unsqueeze(1)), dim=1)
-        self.horizon_commands = torch.cat((self.horizon_commands[:, 1:, :], self.commands.unsqueeze(1)), dim=1)
-        self.horizon_dof_pos = torch.cat((self.horizon_dof_pos[:, 1:, :], self.dof_pos.unsqueeze(1)), dim=1)
-        self.horizon_dof_vel = torch.cat((self.horizon_dof_vel[:, 1:, :], self.dof_vel.unsqueeze(1)), dim=1)
-        self.horizon_actions = torch.cat((self.horizon_actions[:, 1:, :], self.actions.unsqueeze(1)), dim=1)
-        self.horizon_clock_inputs = torch.cat((self.horizon_clock_inputs[:, 1:, :], self.clock_inputs.unsqueeze(1)),
-                                              dim=1)
         # compute observations, rewards, resets, ...
         self.check_termination()
         self.compute_reward()
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         self.reset_idx(env_ids)
         self.compute_observations()  # in some cases a simulation step might be required to refresh some obs (for example body positions)
-
+        # 记录last数据
         self.last_last_actions[:] = self.last_actions[:]
-        self.last_actions[:] = self.actions[:]
+        self.last_last_dof_vel[:] = self.last_dof_vel[:]
         self.last_dof_pos[:] = self.dof_pos[:]
         self.last_dof_vel[:] = self.dof_vel[:]
-        self.last_root_vel[:] = self.root_states[:, 7:13]
-
+        self.last_actions[:] = self.actions[:]
+        self.last_torques[:] = self.torques[:]
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self._draw_debug_vis()
 
@@ -190,10 +178,12 @@ class LeggedRobot(BaseTask):
         self._reset_custom_buffer(env_ids)
 
         # reset buffers
+        self.last_torques[env_ids] = 0.
         self.last_actions[env_ids] = 0.
         self.last_last_actions[env_ids] = 0.
         self.last_dof_pos[env_ids] = self.default_dof_pos
         self.last_dof_vel[env_ids] = 0.
+        self.last_last_dof_vel[env_ids] = 0.
         self.feet_air_time[env_ids] = 0.
         self.episode_length_buf[env_ids] = 0
         self.reset_buf[env_ids] = 1
@@ -242,7 +232,7 @@ class LeggedRobot(BaseTask):
                                   self.dof_vel * self.obs_scales.dof_vel,
                                   self.actions,
                                   self.clock_inputs,
-                                  self.commands[:, 4].unsqueeze(-1)
+                                  self.commands[:, 4:9]
                                   ), dim=-1)
         # add perceptive inputs if not blind
         if self.cfg.terrain.measure_heights:
@@ -397,52 +387,57 @@ class LeggedRobot(BaseTask):
 
     def _step_contact_targets(self):
         frequencies = 1.0
-        phases = 0.5
-        offsets = 0.0
-        bounds = 0.0
-        durations = 0.5  # 站立比例 [0~1]
+        phases = self.commands[:, 5]
+        offsets = self.commands[:, 6]
+        bounds = self.commands[:, 7]
+        durations = self.commands[:, 8]  # 站立比例 [0~1]
         self.gait_indices = torch.remainder(self.gait_indices + self.dt * frequencies, 1.0)
         foot_indices = [self.gait_indices + phases + offsets + bounds,
                         self.gait_indices + bounds,
                         self.gait_indices + offsets,
                         self.gait_indices + phases]
-        self.foot_indices = torch.remainder(torch.cat([foot_indices[i].unsqueeze(1) for i in range(4)], dim=1), 1.0)
+        for idxs in foot_indices:
+            stance_idxs = torch.remainder(idxs, 1) < durations
+            swing_idxs = torch.remainder(idxs, 1) > durations
+            idxs[stance_idxs] = torch.remainder(idxs[stance_idxs], 1) * (0.5 / durations[stance_idxs])
+            idxs[swing_idxs] = 0.5 + (torch.remainder(idxs[swing_idxs], 1) - durations[swing_idxs]) * (
+                    0.5 / (1 - durations[swing_idxs]))
+        self.foot_indices = torch.remainder(
+            torch.cat([foot_indices[i].unsqueeze(1) for i in range(4)], dim=1), 1.0)
         # von mises distribution
-        kappa = 0.03
+        kappa = 0.07
         smoothing_cdf_start = torch.distributions.normal.Normal(0,
                                                                 kappa).cdf  # (x) + torch.distributions.normal.Normal(1, kappa).cdf(x)) / 2
         smoothing_multiplier_FL = (smoothing_cdf_start(torch.remainder(foot_indices[0], 1.0)) * (
                 1 - smoothing_cdf_start(torch.remainder(foot_indices[0], 1.0) - 0.5)) +
                                    smoothing_cdf_start(torch.remainder(foot_indices[0], 1.0) - 1) * (
-                                           1 - smoothing_cdf_start(torch.remainder(foot_indices[0], 1.0) - 0.5 - 1)))
+                                           1 - smoothing_cdf_start(
+                                       torch.remainder(foot_indices[0], 1.0) - 0.5 - 1)))
         smoothing_multiplier_FR = (smoothing_cdf_start(torch.remainder(foot_indices[1], 1.0)) * (
                 1 - smoothing_cdf_start(torch.remainder(foot_indices[1], 1.0) - 0.5)) +
                                    smoothing_cdf_start(torch.remainder(foot_indices[1], 1.0) - 1) * (
-                                           1 - smoothing_cdf_start(torch.remainder(foot_indices[1], 1.0) - 0.5 - 1)))
+                                           1 - smoothing_cdf_start(
+                                       torch.remainder(foot_indices[1], 1.0) - 0.5 - 1)))
         smoothing_multiplier_RL = (smoothing_cdf_start(torch.remainder(foot_indices[2], 1.0)) * (
                 1 - smoothing_cdf_start(torch.remainder(foot_indices[2], 1.0) - 0.5)) +
                                    smoothing_cdf_start(torch.remainder(foot_indices[2], 1.0) - 1) * (
-                                           1 - smoothing_cdf_start(torch.remainder(foot_indices[2], 1.0) - 0.5 - 1)))
+                                           1 - smoothing_cdf_start(
+                                       torch.remainder(foot_indices[2], 1.0) - 0.5 - 1)))
         smoothing_multiplier_RR = (smoothing_cdf_start(torch.remainder(foot_indices[3], 1.0)) * (
                 1 - smoothing_cdf_start(torch.remainder(foot_indices[3], 1.0) - 0.5)) +
                                    smoothing_cdf_start(torch.remainder(foot_indices[3], 1.0) - 1) * (
-                                           1 - smoothing_cdf_start(torch.remainder(foot_indices[3], 1.0) - 0.5 - 1)))
+                                           1 - smoothing_cdf_start(
+                                       torch.remainder(foot_indices[3], 1.0) - 0.5 - 1)))
         self.desired_contact_states[:, 0] = smoothing_multiplier_FL
         self.desired_contact_states[:, 1] = smoothing_multiplier_FR
         self.desired_contact_states[:, 2] = smoothing_multiplier_RL
         self.desired_contact_states[:, 3] = smoothing_multiplier_RR
         # print(self.desired_contact_states)
-        for idxs in foot_indices:
-            stance_idxs = torch.remainder(idxs, 1) < durations
-            swing_idxs = torch.remainder(idxs, 1) > durations
-            idxs[stance_idxs] = torch.remainder(idxs[stance_idxs], 1) * (0.5 / durations)
-            idxs[swing_idxs] = 0.5 + (torch.remainder(idxs[swing_idxs], 1) - durations) * (
-                    0.5 / (1 - durations))
-            # self.foot_indices1 = torch.remainder(torch.cat([foot_indices[i].unsqueeze(1) for i in range(4)], dim=1), 1.0)
         self.clock_inputs[:, 0] = torch.sin(2 * torch.pi * foot_indices[0])
         self.clock_inputs[:, 1] = torch.sin(2 * torch.pi * foot_indices[1])
         self.clock_inputs[:, 2] = torch.sin(2 * torch.pi * foot_indices[2])
         self.clock_inputs[:, 3] = torch.sin(2 * torch.pi * foot_indices[3])
+        # print(self.clock_inputs)
 
     def _compute_torques(self, actions):
         """ Compute torques from actions.
@@ -625,6 +620,7 @@ class LeggedRobot(BaseTask):
         self.forward_vec = to_torch([1., 0., 0.], device=self.device).repeat((self.num_envs, 1))
         self.torques = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device,
                                    requires_grad=False)
+        self.last_torques = torch.zeros_like(self.torques)
         self.p_gains = torch.zeros(self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.d_gains = torch.zeros(self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
         self.actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device,
@@ -634,10 +630,15 @@ class LeggedRobot(BaseTask):
         self.last_last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device,
                                              requires_grad=False)
         self.last_dof_vel = torch.zeros_like(self.dof_vel)
+        self.last_last_dof_vel = torch.zeros_like(self.last_dof_vel)
         self.last_dof_pos = torch.zeros_like(self.dof_pos)
-        self.last_root_vel = torch.zeros_like(self.root_states[:, 7:13])
         self.commands = torch.zeros(self.num_envs, self.cfg.commands.num_commands, dtype=torch.float,
                                     device=self.device, requires_grad=False)  # x vel, y vel, yaw vel, heading
+        # phases offsets bounds durations
+        self.commands[:, 5] = 0.5
+        self.commands[:, 6] = 0.0
+        self.commands[:, 7] = 0.0
+        self.commands[:, 8] = 0.6
         self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.ang_vel],
                                            device=self.device, requires_grad=False, )  # TODO change this
         self.feet_air_time = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float,
@@ -676,6 +677,7 @@ class LeggedRobot(BaseTask):
         self.foot_positions = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices, 0:3]
         self.foot_velocities = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices,
                                7:10]
+        self.last_foot_velocities = torch.zeros_like(self.foot_velocities)
         self.gait_indices = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
         self.clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
         self.desired_contact_states = torch.zeros_like(self.clock_inputs)
@@ -1000,6 +1002,9 @@ class LeggedRobot(BaseTask):
         # Penalize torques
         return torch.sum(torch.square(self.torques), dim=1)
 
+    def _reward_torques_rate(self):
+        return torch.sum(torch.square(self.last_torques - self.torques), dim=1)
+
     def _reward_dof_pos(self):
         return torch.sum(torch.square(self.last_dof_pos - self.dof_pos), dim=1)
 
@@ -1010,6 +1015,11 @@ class LeggedRobot(BaseTask):
     def _reward_dof_acc(self):
         # Penalize dof accelerations
         return torch.sum(torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1)
+
+    def _reward_dof_acc_rate(self):
+        dof_acc = (self.dof_vel - self.last_dof_vel) / self.dt
+        last_dof_acc = (self.last_dof_vel - self.last_last_dof_vel) / self.dt
+        return torch.sum(torch.square(dof_acc - last_dof_acc), dim=1)
 
     def _reward_action_rate(self):
         # Penalize changes in actions
@@ -1148,3 +1158,4 @@ class LeggedRobot(BaseTask):
             torch.norm(self.foot_velocities[:, :, 0:2], dim=2).view(self.num_envs, -1))
         rew_slip = torch.sum(contact_filt * foot_velocities, dim=1)
         return rew_slip
+
