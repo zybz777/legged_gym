@@ -4,8 +4,8 @@ from legged_gym.envs import BuptDogCfg, BuptDogCfgPPO
 class BuptDogFlatCfg(BuptDogCfg):
     class env(BuptDogCfg.env):
         num_envs = 4096
-        horizon = 20
-        num_observations = 48 + 4 + 1 + 4
+        horizon = 30
+        num_observations = (48 + 4 + 1 + 4)
 
     class terrain(BuptDogCfg.terrain):
         mesh_type = "plane"
@@ -35,13 +35,13 @@ class BuptDogFlatCfg(BuptDogCfg):
             # 足端通用
             raibert_heuristic = -0.0015  # 足端xy位置跟踪
             # 摆动腿
-            tracking_contacts_shaped_force = -0.0002  # 摆动腿接触力趋于0
-            feet_clearance_cmd_linear = -0.03  # 摆动腿Z轴高度跟踪
-            feet_air_time = 1.0  # 摆动腿腾空时间大于0.5s
+            tracking_contacts_shaped_force = -0.0004  # 摆动腿接触力趋于0
+            feet_clearance_cmd_linear = -0.05  # 摆动腿Z轴高度跟踪
+            feet_air_time = 2.0  # 摆动腿腾空时间大于0.5s
             feet_stumble = -0.0  # 摆动腿不要碰到垂直面
             # 支撑腿
             tracking_contacts_shaped_vel = -0.0002  # 支撑腿速度为0
-            feet_slip = -0.08  # 支撑腿不滑动
+            feet_slip = -0.2  # 支撑腿不滑动
             # 终止条件
             termination = -0.0
             # 碰撞惩罚
@@ -50,7 +50,7 @@ class BuptDogFlatCfg(BuptDogCfg):
             dof_pos = -0.25  # 两帧之间位置减少突变
             dof_vel = -5e-5  # 两帧之间速度减少突变
             dof_acc = -5e-7  # 每帧加速度趋于0
-            dof_acc_rate = -5e-9  # 两帧之间加速度减少突变
+            dof_acc_rate = 0  # 两帧之间加速度减少突变
             stand_still = -0.00001
             # 关节输出平滑
             action_rate = -2.5e-3  # 两帧之间输出位置减少突变

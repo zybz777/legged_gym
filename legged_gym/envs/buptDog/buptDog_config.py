@@ -42,8 +42,8 @@ class BuptDogCfg(LeggedRobotCfg):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/buptDog/urdf/robot.urdf"
         name = "buptDog"
         foot_name = "FOOT"
-        penalize_contacts_on = ["Y", "KNEE"]
-        terminate_after_contacts_on = ["base"]
+        penalize_contacts_on = ["Y"]
+        terminate_after_contacts_on = ["body"]
         self_collisions = 1  # 1 to disable, 0 to enable...bitwise filter
 
     class rewards(LeggedRobotCfg.rewards):
