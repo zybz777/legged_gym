@@ -1187,7 +1187,6 @@ class LeggedRobot(BaseTask):
 
     def _reward_feet_slip(self):
         contact = self.contact_forces[:, self.feet_indices, 2] > 1.
-        print(self.contact_forces) # 新模型小腿连杆另一端的力分担了足端力，导致足端力很小
         contact_filt = torch.logical_or(contact, self.last_contacts)
         self.last_contacts = contact
         foot_velocities = torch.square(

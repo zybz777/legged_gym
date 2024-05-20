@@ -32,7 +32,7 @@ class BuptDogCfg(LeggedRobotCfg):
         # PD Drive parameters:
         control_type = "P"
         stiffness = {"joint": 20.0}  # [N*m/rad]
-        damping = {"joint": 0.5}  # [N*m*s/rad]
+        damping = {"joint": 1.0}  # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
         # decimation: Number of control action updates @ sim DT per policy DT
@@ -42,7 +42,7 @@ class BuptDogCfg(LeggedRobotCfg):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/buptDog/urdf/robot.urdf"
         name = "buptDog"
         foot_name = "FOOT"
-        penalize_contacts_on = ["Y"]
+        penalize_contacts_on = ["X", "Y", "KNEE"]
         terminate_after_contacts_on = ["body"]
         self_collisions = 1  # 1 to disable, 0 to enable...bitwise filter
 
@@ -51,7 +51,7 @@ class BuptDogCfg(LeggedRobotCfg):
         soft_dof_vel_limit = 0.8
         soft_torque_limit = 0.8
         base_height_target = 1.0
-        max_contact_force = 150
+        max_contact_force = 120
 
         class scales(LeggedRobotCfg.rewards.scales):
             torques = -0.0002

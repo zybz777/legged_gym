@@ -33,11 +33,11 @@ class BuptDogFlatCfg(BuptDogCfg):
             tracking_lin_vel = 4.0  # xy线速度跟踪
             lin_vel_z = -2.0  # z轴线速度趋于0
             # 足端通用
-            raibert_heuristic = -0.0015  # 足端xy位置跟踪
+            raibert_heuristic = -0.001  # 足端xy位置跟踪
             # 摆动腿
             tracking_contacts_shaped_force = -0.0004  # 摆动腿接触力趋于0
-            feet_clearance_cmd_linear = -0.05  # 摆动腿Z轴高度跟踪
-            feet_air_time = 2.0  # 摆动腿腾空时间大于0.5s
+            feet_clearance_cmd_linear = -0.01  # 摆动腿Z轴高度跟踪
+            feet_air_time = 1.0  # 摆动腿腾空时间大于0.5s
             feet_stumble = -0.0  # 摆动腿不要碰到垂直面
             # 支撑腿
             tracking_contacts_shaped_vel = -0.0002  # 支撑腿速度为0
@@ -47,16 +47,16 @@ class BuptDogFlatCfg(BuptDogCfg):
             # 碰撞惩罚
             collision = -2.0
             # 关节平滑
-            dof_pos = -0.25  # 两帧之间位置减少突变
-            dof_vel = -5e-5  # 两帧之间速度减少突变
+            dof_pos = -0.3  # 两帧之间位置减少突变
+            dof_vel = -8e-5  # 两帧之间速度减少突变
             dof_acc = -5e-7  # 每帧加速度趋于0
             dof_acc_rate = 0  # 两帧之间加速度减少突变
             stand_still = -0.00001
             # 关节输出平滑
             action_rate = -2.5e-3  # 两帧之间输出位置减少突变
             action_rate2 = -2.5e-3  # 三帧之间输出位置减少突变
-            torques = -2.5e-5  # 每帧输出力矩趋于0
-            torques_rate = -2.5e-5  # 两帧之间输出力矩减少突变
+            torques = -3e-5  # 每帧输出力矩趋于0
+            torques_rate = -3e-5  # 两帧之间输出力矩减少突变
 
     class commands(BuptDogCfg.commands):
         heading_command = False
