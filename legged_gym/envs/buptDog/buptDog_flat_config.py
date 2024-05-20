@@ -5,7 +5,8 @@ class BuptDogFlatCfg(BuptDogCfg):
     class env(BuptDogCfg.env):
         num_envs = 4096
         horizon = 30
-        num_observations = (48 + 4 + 1 + 4)
+        num_observations = (45 + 4 + 1 + 4)
+        num_privileged_obs = num_observations + 3
 
     class terrain(BuptDogCfg.terrain):
         mesh_type = "plane"
@@ -29,11 +30,11 @@ class BuptDogFlatCfg(BuptDogCfg):
             orientation = -5.0  # 角度跟踪
             tracking_ang_vel = 1.0  # Z轴角速度跟踪
             ang_vel_xy = -0.15  # xy角速度趋于0
-            base_height = -5.0  # 质心高度跟踪
+            base_height = -10.0  # 质心高度跟踪
             tracking_lin_vel = 4.0  # xy线速度跟踪
             lin_vel_z = -2.0  # z轴线速度趋于0
             # 足端通用
-            raibert_heuristic = -0.001  # 足端xy位置跟踪
+            raibert_heuristic = -0.002  # 足端xy位置跟踪
             # 摆动腿
             tracking_contacts_shaped_force = -0.0004  # 摆动腿接触力趋于0
             feet_clearance_cmd_linear = -0.01  # 摆动腿Z轴高度跟踪
