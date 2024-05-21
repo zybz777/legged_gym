@@ -5,7 +5,7 @@ class BuptDogFlatCfg(BuptDogCfg):
     class env(BuptDogCfg.env):
         num_envs = 4096
         horizon = 30
-        num_observations = (45 + 4 + 1 + 4)
+        num_observations = (45 + 4 + 1 + 4 + 12)
         num_privileged_obs = num_observations + 3
 
     class terrain(BuptDogCfg.terrain):
@@ -19,11 +19,11 @@ class BuptDogFlatCfg(BuptDogCfg):
         # 支撑足
         max_contact_force = 100.0
         # 关节限幅
-        soft_dof_pos_limit = 0.8
-        soft_dof_vel_limit = 0.9
-        soft_torque_limit = 0.9
+        soft_dof_pos_limit = 0.6
+        soft_dof_vel_limit = 0.6
+        soft_torque_limit = 0.6
         # 质心跟踪
-        base_height_target = 0.31
+        base_height_target = 0.3
 
         class scales(BuptDogCfg.rewards.scales):
             # 质心跟踪
@@ -31,28 +31,28 @@ class BuptDogFlatCfg(BuptDogCfg):
             tracking_ang_vel = 1.0  # Z轴角速度跟踪
             ang_vel_xy = -0.15  # xy角速度趋于0
             base_height = -10.0  # 质心高度跟踪
-            tracking_lin_vel = 4.0  # xy线速度跟踪
+            tracking_lin_vel = 5.0  # xy线速度跟踪
             lin_vel_z = -2.0  # z轴线速度趋于0
             # 足端通用
             raibert_heuristic = -0.002  # 足端xy位置跟踪
             # 摆动腿
             tracking_contacts_shaped_force = -0.0004  # 摆动腿接触力趋于0
-            feet_clearance_cmd_linear = -0.01  # 摆动腿Z轴高度跟踪
+            feet_clearance_cmd_linear = -0.015  # 摆动腿Z轴高度跟踪
             feet_air_time = 1.0  # 摆动腿腾空时间大于0.5s
             feet_stumble = -0.0  # 摆动腿不要碰到垂直面
             # 支撑腿
-            tracking_contacts_shaped_vel = -0.0002  # 支撑腿速度为0
-            feet_slip = -0.2  # 支撑腿不滑动
+            tracking_contacts_shaped_vel = -0.00025  # 支撑腿速度为0
+            feet_slip = -0.22  # 支撑腿不滑动
             # 终止条件
             termination = -0.0
             # 碰撞惩罚
             collision = -2.0
             # 关节平滑
-            dof_pos = -0.3  # 两帧之间位置减少突变
-            dof_vel = -8e-5  # 两帧之间速度减少突变
-            dof_acc = -5e-7  # 每帧加速度趋于0
-            dof_acc_rate = 0  # 两帧之间加速度减少突变
-            stand_still = -0.00001
+            dof_pos = -0.4  # 两帧之间位置减少突变
+            dof_vel = -5e-4  # 两帧之间速度减少突变
+            dof_acc = -8e-7  # 每帧加速度趋于0
+            dof_acc_rate = -8e-9  # 两帧之间加速度减少突变
+            stand_still = -0.2
             # 关节输出平滑
             action_rate = -2.5e-3  # 两帧之间输出位置减少突变
             action_rate2 = -2.5e-3  # 三帧之间输出位置减少突变
@@ -64,6 +64,8 @@ class BuptDogFlatCfg(BuptDogCfg):
         resampling_time = 4.0
 
         class ranges(BuptDogCfg.commands.ranges):
+            lin_vel_x = [-1.0, 1.0]  # min max [m/s]
+            lin_vel_y = [-0.5, 0.5]  # min max [m/s]
             ang_vel_yaw = [-1.5, 1.5]
 
     class domain_rand(BuptDogCfg.domain_rand):
@@ -98,4 +100,4 @@ class BuptDogFlatCfgPPO(BuptDogCfgPPO):
         run_name = ""
         experiment_name = "flat_buptDog"
         load_run = -1
-        max_iterations = 1000
+        max_iterations = 1500

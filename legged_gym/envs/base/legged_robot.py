@@ -127,6 +127,10 @@ class LeggedRobot(BaseTask):
                                  0:3]
         self.foot_velocities[:] = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices,
                                   7:10]
+        cur_footsteps_translated = self.foot_positions - self.base_pos.unsqueeze(1)
+        # cur_footvels_translated =
+        for i in range(4):
+            self.footsteps_in_body_frame[:, i, :] = quat_rotate_inverse(self.base_quat, cur_footsteps_translated[:, i, :])
         self._post_physics_step_callback()
         self.horizon_base_lin_vel = torch.cat((self.horizon_base_lin_vel[:, 1:, :], self.base_lin_vel.unsqueeze(1)),
                                               dim=1)
@@ -243,7 +247,8 @@ class LeggedRobot(BaseTask):
                                   self.dof_vel * self.obs_scales.dof_vel,
                                   self.actions,
                                   self.clock_inputs,
-                                  self.commands[:, 4:9]
+                                  self.commands[:, 4:9],
+                                  self.footsteps_in_body_frame.reshape(self.num_envs, -1)
                                   ), dim=-1)
         self.privileged_obs_buf = torch.cat((self.obs_buf,
                                              self.base_lin_vel * self.obs_scales.lin_vel,
@@ -712,6 +717,10 @@ class LeggedRobot(BaseTask):
         self.foot_positions = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices, 0:3]
         self.foot_velocities = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices,
                                7:10]
+        self.footsteps_in_body_frame = torch.zeros(self.num_envs, 4, 3, dtype=torch.float, device=self.device,
+                                                   requires_grad=False)
+        self.footvels_in_body_frame = torch.zeros(self.num_envs, 4, 3, dtype=torch.float, device=self.device,
+                                                  requires_grad=False)
         self.last_foot_velocities = torch.zeros_like(self.foot_velocities)
         self.gait_indices = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
         self.clock_inputs = torch.zeros(self.num_envs, 4, dtype=torch.float, device=self.device, requires_grad=False)
